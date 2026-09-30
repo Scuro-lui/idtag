@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDTAG Decoder</title>
+
+<!-- Consente di "installare" la pagina come icona sulla schermata Home -->
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22IDTAG%20Decoder%22%2C%22short_name%22%3A%22IDTAG%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230d0f14%22%2C%22theme_color%22%3A%22%230d0f14%22%7D">
+<meta name="theme-color" content="#0d0f14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="IDTAG">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700&display=swap');
+
+  :root {
+    --bg: #0d0f14;
+    --panel: #141720;
+    --border: #2a2f3d;
+    --orange: #ff6b1a;
+    --orange-dim: rgba(255,107,26,0.15);
+    --orange-glow: rgba(255,107,26,0.4);
+    --green: #39d98a;
+    --green-dim: rgba(57,217,138,0.12);
+    --text: #e8eaf0;
+    --text-dim: #6b7280;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Barlow', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 20px 16px 40px;
+  }
+
+  /* HEADER */
+  .header {
+    text-align: center;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h1 {
+    font-family: var(--mono);
+    font-size: 1.6rem;
+    color: var(--orange);
+    letter-spacing: 0.15em;
+    text-shadow: 0 0 20px var(--orange-glow);
+  }
+  .header p {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    margin-top: 4px;
+    letter-spacing: 0.05em;
+  }
+  .header .author {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    margin-top: 10px;
+    opacity: 0.6;
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .tab {
+    flex: 1;
+    padding: 10px 8px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-family: var(--sans);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+  .tab.active {
+    background: var(--orange-dim);
+    border-color: var(--orange);
+    color: var(--orange);
+  }
+
+  /* PANELS */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* CARD */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 14px;
+  }
+
+  /* BIT DISPLAY */
+  .bit-sequence {
+    font-family: var(--mono);
+    font-size: 1.05rem;
+    letter-spacing: 0.18em;
+    color: var(--orange);
+    min-height: 32px;
+    word-break: break-all;
+    line-height: 1.6;
+    margin-bottom: 14px;
+    padding: 10px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .bit-sequence .bit-b { color: var(--orange); }
+  .bit-sequence .bit-n { color: var(--text-dim); }
+  .bit-sequence .bit-sep { color: #2a2f3d; margin: 0 1px; }
+
+  .bit-count {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+  }
+  .bit-count span { color: var(--orange); font-family: var(--mono); }
+
+  /* BUTTONS B/N */
+  .bn-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .btn-b, .btn-n {
+    padding: 18px 10px;
+    border: none;
+    border-radius: 10px;
+    font-family: var(--mono);
+    font-size: 1.6rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+    letter-spacing: 0.1em;
+  }
+  .btn-b {
+    background: var(--orange);
+    color: #000;
+    box-shadow: 0 4px 20px var(--orange-glow);
+  }
+  .btn-b:active { transform: scale(1.06); box-shadow: 0 6px 28px var(--orange-glow); }
+  .btn-n {
+    background: #d0d4df;
+    color: #1a1a2e;
+    border: 2px solid #b0b6c8;
+  }
+  .btn-n:active { transform: scale(1.06); box-shadow: 0 4px 16px rgba(200,210,230,0.3); }
+
+  .btn-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .btn-del, .btn-reset {
+    padding: 10px;
+    border-radius: 8px;
+    font-family: var(--sans);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border: none;
+    transition: all 0.15s;
+  }
+  .btn-del {
+    background: rgba(255,80,80,0.12);
+    color: #ff5050;
+    border: 1px solid rgba(255,80,80,0.3);
+  }
+  .btn-del:active { transform: scale(0.96); }
+  .btn-reset {
+    background: rgba(107,114,128,0.12);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+  .btn-reset:active { transform: scale(0.96); }
+
+  /* DECODE BUTTON */
+  .btn-decode {
+    width: 100%;
+    padding: 14px;
+    margin-top: 14px;
+    background: var(--orange);
+    color: #000;
+    border: none;
+    border-radius: 10px;
+    font-family: var(--sans);
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 4px 20px var(--orange-glow);
+    transition: all 0.15s;
+  }
+  .btn-decode:active { transform: scale(0.98); }
+  .btn-decode:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  /* EDIT IDTAG INPUT */
+  .idtag-input-wrap {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .idtag-input {
+    flex: 1;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    color: var(--orange);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .idtag-input:focus { border-color: var(--orange); }
+  .idtag-input::placeholder { color: var(--text-dim); opacity: 0.4; }
+  .btn-go {
+    padding: 12px 18px;
+    background: var(--orange);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    font-family: var(--sans);
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+  }
+  .btn-go:active { transform: scale(0.96); }
+
+  /* RESULT */
+  .result {
+    display: none;
+    background: var(--green-dim);
+    border: 1px solid rgba(57,217,138,0.25);
+    border-radius: 12px;
+    padding: 18px;
+    margin-top: 16px;
+  }
+  .result.visible { display: block; }
+  .result-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--green);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 14px;
+  }
+  .result-code {
+    font-family: var(--mono);
+    font-size: 1.5rem;
+    color: var(--green);
+    letter-spacing: 0.25em;
+    margin-bottom: 16px;
+    text-shadow: 0 0 15px rgba(57,217,138,0.4);
+  }
+  .result-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(57,217,138,0.1);
+  }
+  .result-row:last-child { border-bottom: none; }
+  .result-label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .result-value {
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    color: var(--text);
+    text-align: right;
+    max-width: 60%;
+  }
+
+  /* ERROR */
+  .error-msg {
+    display: none;
+    background: rgba(255,80,80,0.1);
+    border: 1px solid rgba(255,80,80,0.3);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 0.82rem;
+    color: #ff7070;
+    margin-top: 12px;
+  }
+  .error-msg.visible { display: block; }
+
+  /* PROGRESS BAR */
+  .progress-wrap {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-bottom: 6px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--orange);
+    border-radius: 2px;
+    transition: width 0.2s;
+    box-shadow: 0 0 8px var(--orange-glow);
+  }
+
+  .toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-row span { font-size: 0.82rem; color: var(--text); }
+  .switch {
+    position: relative;
+    width: 42px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--border);
+    border-radius: 24px;
+    transition: 0.2s;
+  }
+  .switch-slider::before {
+    content: "";
+    position: absolute;
+    height: 18px; width: 18px;
+    left: 3px; bottom: 3px;
+    background: var(--text-dim);
+    border-radius: 50%;
+    transition: 0.2s;
+  }
+  .switch input:checked + .switch-slider { background: var(--orange-dim); border: 1px solid var(--orange); }
+  .switch input:checked + .switch-slider::before { transform: translateX(18px); background: var(--orange); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>▌▌ IDTAG DECODER ▌▌</h1>
+  <p>Decodifica codici fluorescenti postali</p>
+  <div class="author" style="color:var(--orange);opacity:0.85;">by Gigi Scuro OCPI</div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('manual')">Inserimento<br>B / N</button>
+  <button class="tab" onclick="switchTab('edit')">Inserimento<br>IDTAG</button>
+</div>
+
+<!-- TAB MANUALE -->
+<div id="tab-manual" class="panel active">
+  <div class="card">
+    <div class="card-title">Sequenza bit</div>
+    <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:12px;letter-spacing:0.04em;">
+      Batti tutti i bit dalla lettera, start incluso — viene scartato automaticamente.
+    </div>
+    <div id="start-indicator" style="text-align:center;margin-bottom:10px;font-size:0.72rem;color:var(--orange);letter-spacing:0.08em;display:block;">
+      ▶ In attesa dello START...
+    </div>
+    <div class="bit-sequence" id="bit-display">
+      <span style="color:var(--text-dim);font-size:0.8rem;letter-spacing:0.05em">Batti il primo bit (start)...</span>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+    </div>
+    <div class="bit-count">Bit inseriti: <span id="bit-count">0</span> / 40</div>
+    <div class="bn-buttons">
+      <button class="btn-b" onclick="addBit('B')">B<br><span style="font-size:0.6rem;font-weight:400;letter-spacing:0.05em">BARRA</span></button>
+      <button class="btn-n" onclick="addBit('N')">N<br><span style="font-size:0.6rem;font-weight:400;letter-spacing:0.05em">NEUTRO</span></button>
+    </div>
+    <div class="btn-actions">
+      <button class="btn-del" onclick="deleteLast()">&#9664; Cancella</button>
+      <button class="btn-reset" onclick="resetManual()">Reset</button>
+    </div>
+    <button class="btn-decode" id="btn-decode-manual" onclick="decodeManual()" disabled>Decodifica</button>
+  </div>
+
+  <div class="result" id="result-manual"></div>
+  <div class="error-msg" id="error-manual"></div>
+</div>
+
+<!-- TAB EDIT IDTAG -->
+<div id="tab-edit" class="panel">
+  <div class="card">
+    <div class="card-title">Inserisci codice IDTAG (10 caratteri)</div>
+    <div class="idtag-input-wrap">
+      <input class="idtag-input" id="idtag-input" maxlength="10" placeholder="A900BB1325"
+        oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')decodeEdit()">
+      <button class="btn-go" onclick="decodeEdit()">OK</button>
+    </div>
+    <div style="font-size:0.72rem;color:var(--text-dim);">Formato: 10 cifre alfanumeriche (0–9, A–C)</div>
+  </div>
+
+  <div class="result" id="result-edit"></div>
+  <div class="error-msg" id="error-edit"></div>
+</div>
+
+<script>
+// ── LOOKUP TABLES ────────────────────────────────────────────────
+const BIT_TO_DIGIT = {
+  'BBBB':'0','BBBН':'1','BBНB':'2','BBНН':'3',
+  'BНBB':'4','BНBН':'5','BННB':'6',
+  'НBBB':'7','НBBН':'8','НBНB':'9','НBНН':'A','ННBB':'B','ННBН':'C'
+};
+// Build reverse too (digit -> bits)
+const DIGIT_TO_BITS = {};
+for(const [k,v] of Object.entries(BIT_TO_DIGIT)) DIGIT_TO_BITS[v]=k;
+
+// Normalize: accept B/N or B/H or b/n etc
+function normBit(c){ return (c==='B'||c==='b')?'B':'Н'; }
+
+const F2_TABLE = {
+  '0':'Ordinaria LC','1':'Ordinaria C5','2':'Ordinaria C5+','3':'Ordinaria Flat',
+  '4':'Prioritaria LC','5':'Prioritaria C5','6':'Prioritaria C5+','7':'Prioritaria Flat',
+  '8':'CL3 LC','9':'CL3 C5','A':'CL3 C5+','B':'CL3 Flat'
+};
+
+// ── AUDIO ────────────────────────────────────────────────────────
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function getAudioCtx(){ if(!audioCtx) audioCtx = new AudioCtx(); return audioCtx; }
+function playTone(freq, duration, type='sine'){
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = type; osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(0.45, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + duration);
+  } catch(e){}
+}
+function soundB(){ playTone(1000, 0.15, 'square'); }  // onda quadra, nota alta
+function soundN(){ playTone(400, 0.15, 'square'); }   // onda quadra, nota bassa - stessa "forza" di B, solo tono diverso
+function soundStart(){ playTone(660, 0.18, 'triangle'); }
+function soundReady(){ playTone(880,0.2,'sine'); setTimeout(()=>playTone(1320,0.25,'sine'),150); }
+
+// ── STATE ────────────────────────────────────────────────────────
+let bits = []; // array of 'B' or 'Н'
+let startReceived = false; // first bit (start) received and discarded
+
+// ── TAB SWITCHING ─────────────────────────────────────────────────
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    t.classList.toggle('active', (i===0&&tab==='manual')||(i===1&&tab==='edit'));
+  });
+  document.getElementById('tab-manual').classList.toggle('active', tab==='manual');
+  document.getElementById('tab-edit').classList.toggle('active', tab==='edit');
+}
+
+// ── MANUAL INPUT ──────────────────────────────────────────────────
+function updateDisplay(){
+  const disp = document.getElementById('bit-display');
+  const countEl = document.getElementById('bit-count');
+  const bar = document.getElementById('progress-bar');
+  const btn = document.getElementById('btn-decode-manual');
+
+  if(bits.length === 0){
+    disp.innerHTML = '<span style="color:var(--text-dim);font-size:0.8rem;letter-spacing:0.05em">Premi B o N per ogni bit...</span>';
+  } else {
+    let html = '';
+    for(let i=0;i<bits.length;i++){
+      if(i>0 && i%4===0) html += '<span class="bit-sep">|</span>';
+      const cls = bits[i]==='B'?'bit-b':'bit-n';
+      html += `<span class="${cls}">${bits[i]==='Н'?'N':bits[i]}</span>`;
+    }
+    disp.innerHTML = html;
+  }
+
+  countEl.textContent = bits.length;
+  bar.style.width = Math.min(100, (bits.length/40)*100) + '%';
+  btn.disabled = bits.length !== 40;
+}
+
+function addBit(b){
+  if(!startReceived){
+    // First press is the start bit — discard it, just give audio feedback
+    startReceived = true;
+    soundStart();
+    document.getElementById('start-indicator').style.display = 'none';
+    updateDisplay();
+    return;
+  }
+  if(bits.length >= 40) return;
+  const bit = b==='B' ? 'B' : 'Н';
+  bits.push(bit);
+  if(bit==='B') soundB(); else soundN();
+  if(bits.length===40) soundReady();
+  updateDisplay();
+  hideResults('manual');
+}
+
+function deleteLast(){
+  if(bits.length===0) return;
+  bits.pop();
+  updateDisplay();
+  hideResults('manual');
+}
+
+function resetManual(){
+  bits=[];
+  startReceived=false;
+  document.getElementById('start-indicator').style.display = 'block';
+  updateDisplay();
+  hideResults('manual');
+}
+
+function decodeManual(){
+  if(bits.length!==40){ showError('manual','Inserisci esattamente 40 bit.'); return; }
+  const seq = bits.join('');
+  let code='';
+  for(let i=0;i<40;i+=4){
+    const group = seq.slice(i,i+4);
+    const d = BIT_TO_DIGIT[group];
+    if(d===undefined){ showError('manual',`Gruppo non riconosciuto: ${group.replace(/Н/g,'N')} (posizione ${i/4+1})`); return; }
+    code+=d;
+  }
+  showResult('manual', code);
+}
+
+// ── EDIT IDTAG ────────────────────────────────────────────────────
+function decodeEdit(){
+  const raw = document.getElementById('idtag-input').value.trim().toUpperCase();
+  hideResults('edit');
+  if(raw.length!==10){ showError('edit','Il codice IDTAG deve essere esattamente 10 caratteri.'); return; }
+  const valid = /^[0-9ABC]{10}$/.test(raw);
+  if(!valid){ showError('edit','Caratteri non validi. Usa solo 0–9 e A, B, C.'); return; }
+  showResult('edit', raw);
+}
+
+// ── DECODE & DISPLAY ──────────────────────────────────────────────
+function decodeIDTAG(code){
+  // F0-F1: linea/macchina
+  const zona = code[0];
+  const macchina = code[1];
+  // F2: classe/formato
+  const classe = F2_TABLE[code[2]] || '?';
+  // F3-F5: mezz'ore nel mese (base 13)
+  const digits = '0123456789ABC';
+  // F3-F5: contatore mezz'ore in base 12 (A=10, B=11, C=12)
+  const f3 = digits.indexOf(code[3]);
+  const f4 = digits.indexOf(code[4]);
+  const f5 = digits.indexOf(code[5]);
+  const mezze = f3*144 + f4*12 + f5;
+  const giornoNum = Math.floor(mezze / 48) + 1;
+  const mezzoraIdx = mezze % 48;
+  const ora = Math.floor(mezzoraIdx / 2);
+  const minuti = (mezzoraIdx % 2) === 0 ? '00' : '30';
+  const dataStr = `Giorno ${giornoNum} · ore ${String(ora).padStart(2,'0')}:${minuti}`;
+
+  return { zona, macchina, classe, dataStr, raw: code };
+}
+
+function showResult(tab, code){
+  const el = document.getElementById('result-'+tab);
+  const r = decodeIDTAG(code);
+  el.innerHTML = `
+    <div class="result-title">✓ Decodifica completata</div>
+    <div class="result-code">${r.raw}</div>
+    <div class="result-row">
+      <span class="result-label">Zona / Macchina</span>
+      <span class="result-value">${r.zona} · ${r.macchina}</span>
+    </div>
+    <div class="result-row">
+      <span class="result-label">Classe / Formato</span>
+      <span class="result-value">${r.classe}</span>
+    </div>
+    <div class="result-row">
+      <span class="result-label">Data di codifica</span>
+      <span class="result-value">${r.dataStr}</span>
+    </div>
+
+  `;
+  el.classList.add('visible');
+}
+
+function showError(tab, msg){
+  const el = document.getElementById('error-'+tab);
+  el.textContent = '⚠ ' + msg;
+  el.classList.add('visible');
+}
+
+function hideResults(tab){
+  document.getElementById('result-'+tab).classList.remove('visible');
+  document.getElementById('error-'+tab).classList.remove('visible');
+}
+
+
+// init
+updateDisplay();
+</script>
+</body>
+</html>
